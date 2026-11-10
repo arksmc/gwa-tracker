@@ -117,13 +117,16 @@ export function describeGrade(result: GradeResult | null): string {
   return `Grade ${result.grade}`
 }
 
-export type SkipReason = 'no-scores' | 'no-scale' | 'outside-scale' | 'not-numeric'
+export type SkipReason =
+  | 'no-scores' | 'no-scale' | 'outside-scale' | 'not-numeric' | 'inc' | 'dropped'
 
 export const skipReasonText: Record<SkipReason, string> = {
   'no-scores': 'no scores yet',
   'no-scale': 'scale not set',
   'outside-scale': 'outside scale',
   'not-numeric': 'no numeric grade',
+  inc: 'incomplete (INC)',
+  dropped: 'dropped',
 }
 
 export type SemesterSummary = {
@@ -142,29 +145,37 @@ export function semesterSummary(courses: Course[]): SemesterSummary {
   const skipped: SemesterSummary['skipped'] = []
 
   for (const course of courses) {
-    totalUnits += course.units
-    const result = courseGrade(course)
-    if (result === null) {
-      skipped.push({ course, reason: 'no-scores' })
-      continue
-    }
-    if (result.status === 'unconfigured') {
-      skipped.push({ course, reason: 'no-scale' })
-      continue
-    }
-    if (result.status === 'outside') {
-      skipped.push({ course, reason: 'outside-scale' })
-      continue
-    }
-    const value = parseFloat(result.grade)
-    if (Number.isNaN(value)) {
-      skipped.push({ course, reason: 'not-numeric' })
-      continue
-    }
-    points += value * course.units
-    countedUnits += course.units
-    counted.push(course)
+  if (course.status === 'drp') {
+    skipped.push({ course, reason: 'dropped' })
+    continue
   }
+  totalUnits += course.units
+  if (course.status === 'inc') {
+    skipped.push({ course, reason: 'inc' })
+    continue
+  }
+  const result = courseGrade(course)
+  if (result === null) {
+    skipped.push({ course, reason: 'no-scores' })
+    continue
+  }
+  if (result.status === 'unconfigured') {
+    skipped.push({ course, reason: 'no-scale' })
+    continue
+  }
+  if (result.status === 'outside') {
+    skipped.push({ course, reason: 'outside-scale' })
+    continue
+  }
+  const value = parseFloat(result.grade)
+  if (Number.isNaN(value)) {
+    skipped.push({ course, reason: 'not-numeric' })
+    continue
+  }
+  points += value * course.units
+  countedUnits += course.units
+  counted.push(course)
+}
 
   return {
     gwa: countedUnits > 0 ? points / countedUnits : null,
@@ -180,11 +191,7 @@ export function computeGwa(courses: Course[]): number | null {
 }
 
 export type RangeSkip =
-  | 'no-items'
-  | 'no-scores'
-  | 'no-scale'
-  | 'outside-scale'
-  | 'not-numeric'
+  | 'no-items' | 'no-scores' | 'no-scale' | 'outside-scale' | 'not-numeric' | 'inc' | 'dropped'
 
 export const rangeSkipText: Record<RangeSkip, string> = {
   'no-items': 'no work added yet',
@@ -192,6 +199,8 @@ export const rangeSkipText: Record<RangeSkip, string> = {
   'no-scale': 'scale not set',
   'outside-scale': 'outside scale',
   'not-numeric': 'no numeric grade',
+  inc: 'incomplete (INC)',
+  dropped: 'dropped',
 }
 
 export type CourseRange = {
@@ -219,7 +228,10 @@ export function courseRange(course: Course): CourseRange {
     locked: false,
   }
 
-  if (course.locked) {
+  if (course.status === 'drp') return { ...empty, skip: 'dropped' }
+if (course.status === 'inc') return { ...empty, skip: 'inc' }
+
+  if (course.status === 'complete') {
   if (nowResult === null) return { ...empty, skip: 'no-scores' }
   if (nowResult.status === 'unconfigured') return { ...empty, skip: 'no-scale' }
   if (nowResult.status === 'outside') return { ...empty, skip: 'outside-scale' }
@@ -266,7 +278,7 @@ export function courseRange(course: Course): CourseRange {
     worst: worst.grade,
     bestValue,
     worstValue,
-    locked: course.locked === true,
+    locked: false,
     skip: null,
   }
 }
@@ -287,6 +299,7 @@ export function semesterRange(courses: Course[]): SemesterRange {
   let totalUnits = 0
 
   for (const r of rows) {
+    if (r.course.status === 'drp') continue
     totalUnits += r.course.units
     if (r.skip !== null || r.bestValue === null || r.worstValue === null) continue
     bestPoints += r.bestValue * r.course.units

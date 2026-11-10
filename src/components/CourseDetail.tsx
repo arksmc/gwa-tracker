@@ -73,21 +73,26 @@ export default function CourseDetail({ course, onBack }: Props) {
   </p>
   <p className="text-sm text-slate-600">{describeGrade(result)}</p>
   <button
-    onClick={() => updateCourse(course.id, (c) => ({ ...c, locked: !c.locked }))}
-    className={`mt-1 inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs ${
-      course.locked
-        ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-        : 'border-slate-300 text-slate-600'
-    }`}
-  >
-    {course.locked ? <Lock size={12} /> : <Unlock size={12} />}
-    {course.locked ? 'Complete' : 'Mark as complete'}
-  </button>
-  {course.locked && pendingCount > 0 && (
-    <p className="mt-1 text-xs text-amber-700">
-      {pendingCount} not-taken {pendingCount === 1 ? 'item' : 'items'} won't count
-    </p>
-  )}
+  onClick={() =>
+    updateCourse(course.id, (c) => ({
+      ...c,
+      status: c.status === 'complete' ? 'active' : 'complete',
+    }))
+  }
+  className={`mt-1 inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs ${
+    course.status === 'complete'
+      ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+      : 'border-slate-300 text-slate-600'
+  }`}
+>
+  {course.status === 'complete' ? <Lock size={12} /> : <Unlock size={12} />}
+  {course.status === 'complete' ? 'Complete' : 'Mark as complete'}
+</button>
+{course.status === 'complete' && pendingCount > 0 && (
+  <p className="mt-1 text-xs text-amber-700">
+    {pendingCount} not-taken {pendingCount === 1 ? 'item' : 'items'} won't count
+  </p>
+)}
 </div>
         </div>
       </header>
