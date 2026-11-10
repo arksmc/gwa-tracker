@@ -4,6 +4,7 @@ import { componentPercent } from '../lib/grading'
 import { newComponent } from '../lib/tree'
 import { ChevronDown, ChevronRight, Settings } from 'lucide-react'
 import NumInput from './NumInput'
+import { useStore } from '../store'
 
 type Props = {
   node: GradeComponent
@@ -87,6 +88,8 @@ function ScoreForm({ initial, cancelLabel = 'Cancel', onSave, onCancel, onDelete
 }
 
 export default function ComponentNode({ node, depth, edit, remove }: Props) {
+  const undoable = useStore((s) => s.undoable)
+
   const [open, setOpen] = useState(depth < 2)
   const [setupOpen, setSetupOpen] = useState(false)
   const [scoresMode, setScoresMode] = useState(false)
@@ -138,10 +141,13 @@ export default function ComponentNode({ node, depth, edit, remove }: Props) {
   }
 
   function removeAssessment(id: string) {
-    edit(node.id, (c) => ({
-      ...c,
-      assessments: c.assessments.filter((a) => a.id !== id),
-    }))
+    const a = node.assessments.find((x) => x.id === id)
+    undoable(`Deleted score "${a?.name ?? ''}"`, node.id, () =>
+      edit(node.id, (c) => ({
+        ...c,
+        assessments: c.assessments.filter((x) => x.id !== id),
+      }))
+    )
   }
 
   const parts = [
@@ -153,9 +159,9 @@ export default function ComponentNode({ node, depth, edit, remove }: Props) {
     <div>
       <div className="flex items-center gap-1">
         {isRoot ? null : canCollapse ? (
-            <button onClick={() => setOpen(!open)} className="w-5 text-slate-400">
-                {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-            </button>
+          <button onClick={() => setOpen(!open)} className="w-5 text-slate-400">
+            {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          </button>
         ) : (
           <span className="w-5" />
         )}
@@ -175,14 +181,16 @@ export default function ComponentNode({ node, depth, edit, remove }: Props) {
               {percent === null ? '—' : `${percent.toFixed(1)}%`}
             </span>
             <button
-  onClick={() => setSetupOpen(!setupOpen)}
-  aria-label="Component setup"
-  className={`ml-1 flex h-7 w-7 items-center justify-center rounded ${
-    setupOpen ? 'bg-slate-200 text-slate-800' : 'text-slate-400 hover:text-slate-700'
-  }`}
->
-  <Settings size={16} />
-</button>
+              onClick={() => setSetupOpen(!setupOpen)}
+              aria-label="Component setup"
+              className={`ml-1 flex h-7 w-7 items-center justify-center rounded ${
+                setupOpen
+                  ? 'bg-slate-200 text-slate-800'
+                  : 'text-slate-400 hover:text-slate-700'
+              }`}
+            >
+              <Settings size={16} />
+            </button>
           </>
         )}
       </div>
@@ -241,11 +249,7 @@ export default function ComponentNode({ node, depth, edit, remove }: Props) {
               </button>
             )}
             <button
-              onClick={() => {
-                if (window.confirm(`Delete "${node.name}" and everything in it?`)) {
-                  remove(node.id)
-                }
-              }}
+              onClick={() => undoable(`Deleted "${node.name}"`, node.id, () => remove(node.id))}
               className="ml-auto text-red-600"
             >
               Delete
